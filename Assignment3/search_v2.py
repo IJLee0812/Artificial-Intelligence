@@ -147,7 +147,7 @@ def uniformCostSearch(problem):
     # Make an empty list of actions
     actionList = []
     # Place the starting point in the priority queue
-    fringe.push((problem.getStartState(), actionList), problem)
+    fringe.push((problem.getStartState(), actionList), problem) # initially add 'problem' information of cost section
     while fringe:
         node, actions = fringe.pop()
         if not node in visited:

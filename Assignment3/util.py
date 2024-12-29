@@ -1,10 +1,5 @@
 # util.py
 # -------
-
-
-
-# util.py
-# -------
 '''
 Copyright (C) Computer Science & Engineering, Soongsil University. This material is for educational uses only. 
 Some contents are based on the material provided by other paper/book authors and may be copyrighted by them. 

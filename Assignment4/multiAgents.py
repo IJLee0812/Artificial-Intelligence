@@ -69,7 +69,8 @@ class ReflexAgent(Agent):
         newScaredTimes = [ghostState.scaredTimer for ghostState in newGhostStates]
 
         "*** YOUR CODE HERE ***"
-        # Calculating distance to the farthest food pellet
+        # Calculate the minimum distance to the nearest food pellet
+        # The smaller this distance, the better, as Pacman aims to consume food
         newFoodList = newFood.asList()
         min_food_distance = -1
         for food in newFoodList:
@@ -77,16 +78,20 @@ class ReflexAgent(Agent):
             if min_food_distance >= distance or min_food_distance == -1:
                 min_food_distance = distance
 
-        # Calculating the distances from pacman to the ghosts. Also, checking for the proximity of the ghosts (at dist of 1) around pacman
-        distances_to_ghosts = 1
-        proximity_to_ghosts = 0
+        # Calculate the total distances from Pacman to all ghosts
+        # Additionally, check if any ghost is too close (distance <= 1), which increases the danger to Pacman
+        distances_to_ghosts = 1  # Initialize the ghost distance sum
+        proximity_to_ghosts = 0 # Count how many ghosts are within close proximity
         for ghost_state in successorGameState.getGhostPositions():
             distance = util.manhattanDistance(newPos, ghost_state)
-            distances_to_ghosts += distance
+            distances_to_ghosts += distance  # Accumulate distances to ghosts
             if distance <= 1:
-                proximity_to_ghosts += 1
+                proximity_to_ghosts += 1 # Increment the count of nearby ghosts
 
-        # Return the combination of the above calculated metrics
+        # Combine the metrics into an overall evaluation score:
+        # - Favor states closer to food
+        # - Penalize states closer to ghosts
+        # - Penalize states with nearby ghosts more heavily        
         return successorGameState.getScore() + (1 / float(min_food_distance)) - (1 / float(distances_to_ghosts)) - proximity_to_ghosts
 
 def scoreEvaluationFunction(currentGameState):
@@ -148,31 +153,32 @@ class MinimaxAgent(MultiAgentSearchAgent):
         Returns whether or not the game state is a losing state
         """
         "*** YOUR CODE HERE ***"
-        # Define a miniMax function first
+        # Define the recursize minimax function
         def miniMax(agent, depth, gameState):
-            if gameState.isLose() or gameState.isWin() or depth == self.depth: # return the reward in case the defined depth is reached or the game is won/lost
+            if gameState.isLose() or gameState.isWin() or depth == self.depth: # Return the reward in case the defined depth is reached or the game is won/lost
                 return self.evaluationFunction(gameState)
-            if agent == 0: # maximize for pacman
+            if agent == 0: # Pacman : maximize the score
                 return max(miniMax(1, depth, gameState.generateSuccessor(agent, newState)) for newState in gameState.getLegalActions(agent))
-            else: # minimize for ghosts
-                nextAgent = agent + 1 # calculate the next agent and increase depth accordingly
+            else: # Ghosts : minimize the score
+                nextAgent = agent + 1 # Calculate the next agent and increase depth accordingly
                 if gameState.getNumAgents() == nextAgent:
                     nextAgent = 0
                 if nextAgent == 0:
                     depth += 1
-                return min(miniMax(nextAgent, depth, gameState.generateSuccessor(agent, newState)) for newState in gameState.getLegalActions(agent))
+                return min(
+                    miniMax(nextAgent, depth, gameState.generateSuccessor(agent, newState)) for newState in gameState.getLegalActions(agent)
+                    )
 
-        # Performing maximize action for the root node, i.e. pacman
-        maximum = float("-inf")
-        action = Directions.WEST
-        for agentState in gameState.getLegalActions(0):
-            utility = miniMax(1, 0, gameState.generateSuccessor(0, agentState))
-            if (utility > maximum or maximum == float("-inf")):
-                maximum = utility
-                action = agentState
+        # Perform minimax on the root node (Pacman's turn)
+        maxUtility = float("-inf")
+        bestAction = None
+        for action in gameState.getLegalActions(0):
+            utility = miniMax(1, 0, gameState.generateSuccessor(0, action))
+            if utility > maxUtility:
+                maxUtility = utility
+                bestAction = action
 
-        # Finally, return an action
-        return action
+        return bestAction
 
 class AlphaBetaAgent(MultiAgentSearchAgent):
     """
@@ -184,64 +190,76 @@ class AlphaBetaAgent(MultiAgentSearchAgent):
         Returns the minimax action using self.depth and self.evaluationFunction
         """
         "*** YOUR CODE HERE ***"
-        # Define a maximizer function
+        # Define a maximizer function for Pacman's turn
         def maximizer(agent, depth, game_state, a, b): 
-            v = float("-inf")
-            for newState in game_state.getLegalActions(agent):
+            v = float("-inf") # Initalize the utility value to negative infinity
+            for newState in game_state.getLegalActions(agent): # Iterate through all possible actions
                 v = max(v, alpha_beta_prune(1, depth, game_state.generateSuccessor(agent, newState), a, b))
                 
+                # If the current utility exceeds beta, prune further exploration
                 if v > b:
                     return v
                 
+                # Update alpha with the current best utility
                 a = max(a, v)
             
             return v
 
-        # Define a minimizer function
+        # Define a minimizer function for the Ghost's turn
         def minimizer(agent, depth, game_state, a, b): 
-            v = float("inf")
+            v = float("inf") # Initialize the utility value to positive infinity
 
-            next_agent = agent + 1 # calculate the next agent and increase depth accordingly
-            if game_state.getNumAgents() == next_agent:
+            # Calculate the next agent index and handle depth increment if the last agent's turn ends
+            next_agent = agent + 1 # Calculate the next agent and increase depth accordingly
+            if game_state.getNumAgents() == next_agent: # Wrap around to Pacman after the last ghost
                 next_agent = 0
             if next_agent == 0:
-                depth += 1
+                depth += 1 # Increase the depth when transitioning back to Pacman
 
-            for newState in game_state.getLegalActions(agent):
+            for newState in game_state.getLegalActions(agent): # Iterate through all possible actions
                 v = min(v, alpha_beta_prune(next_agent, depth, game_state.generateSuccessor(agent, newState), a, b))
 
+                # If the current utility is less than alpha, prune further exploration
                 if v < a:
                     return v
                 
+                # Update beta with the current best utility
                 b = min(b, v)
             
             return v
         
-        # Define a Alpha-Beta pruning function
+        # Define a alpha-beta pruning function
         def alpha_beta_prune(agent, depth, game_state, a, b):
+            # Terminate the search if a win/lose state is reached or if the depth limit is met
             if game_state.isLose() or game_state.isWin() or depth == self.depth: # return the reward in case the defined depth is reached or the game is won/lost
                 return self.evaluationFunction(game_state)
             
-            if agent == 0: # maximize for pacman
+            # Call the appropriate function based on the agent type (Pacman or Ghost)
+            if agent == 0: # Pacman's turn (maximize)
                 return maximizer(agent, depth, game_state, a, b)
-            else: # minimize for ghosts
+            else: # Ghost's turn (minimize)
                 return minimizer(agent, depth, game_state, a, b)
             
-        # Performing maximizer function to the root node, i.e. pacman using Alpha-Beta pruning function
-        utility = float("-inf")
-        action = Directions.WEST
-        alpha = float("-inf")
-        beta = float("inf")
+        # Perform the maximizer function on the root node (Pacman's turn)
+        utility = float("-inf")  # Initialize the utility value to negative infinity
+        action = Directions.WEST  # Default action
+        alpha = float("-inf")  # Initialize alpha to negative infinity
+        beta = float("inf")  # Initialize beta to positive infinity
 
+        # Iterate through Pacman's legal actions to find the best one
         for agentState in gameState.getLegalActions(0):
             ghostValue = alpha_beta_prune(1, 0, gameState.generateSuccessor(0, agentState), alpha, beta)
             
+            # Update the best utility and corresponding action
             if ghostValue > utility:
                 utility = ghostValue
                 action = agentState
+
+             # If the utility exceeds beta, prune further exploration    
             if utility > beta:
                 return utility
             
+            # Update alpha with the current best utility
             alpha = max(alpha, utility)
 
         # Finally, return an action
